@@ -1,0 +1,229 @@
+```{r warning=FALSE}
+library(plotly)
+library(crosstalk)
+library(tidyverse)
+library(stargazer)
+library(margins)
+library(ggeffects)
+library(interactions)
+library(dagitty)
+library(ggdag)
+library(readxl)
+library(tidyr)
+library(zoo)
+library(lubridate)
+library(ggplot2)
+library(scales)
+library(sp)
+library(rgdal)
+library(cowplot)
+library(ggpubr)
+library(maps)
+library(sf)
+library(GISTools)
+library(Rcpp)
+library(imager)
+library(ggimage)
+library(magick)
+library(tidyverse)
+library(gganimate)
+library(png)
+library(gapminder)
+library(gifski)
+library(reshape2)
+library(titanic)
+library(readr)
+library(collapsibleTree)
+```
+
+```{r}
+flights_USA = read_excel("TSA.xlsx")
+park = read_excel("National Park.xlsx")
+hotel = read_excel("Hotel Booking Volume.xlsx")
+covid_USA = read_excel("COVID_US.xlsx")
+tourismGDP_USA = read_excel("Tourism_USA.xlsx")
+tour_year <- data.frame (year  = c(2017, 2018, 2019, 2020, 2021),
+                         gdp = c(230220, 242215, 239041, 147164, 63301),
+                         growth_rate = c(0.4, 5.2, -1.3, -38.4, -57.0)
+                  )
+
+AL_Rev = read_excel("AL_Rev.xlsx")
+AL_Pro = read_excel("AL_Pro.xlsx")
+AL_Promar = read_excel("AL_Promar.xlsx")
+AL_Proyr = read_excel("AL_Proyr.xlsx")
+```
+
+```{r}
+merged_USA = merge(flights_USA, covid_USA, by="Date",all=TRUE)
+merged_USA = merge(merged_USA, tourismGDP_USA, by="Date",all=TRUE) 
+```
+
+```{r}
+# Bar and Line Demostrating the Change in Tourism GDP
+scale = 5000
+ggplot(data=tour_year,aes(x=year))+
+  geom_bar(aes(y=gdp),stat="identity", fill = "gold")+
+  geom_line(aes(y=(growth_rate+50)*scale),stat="identity")+ 
+  geom_hline(yintercept=2.5e+05, linetype="dashed", color = "red")+
+  labs(title= "Tourism GDP along Years",
+       x="Year (End in August)",y="Tourism GDP in Million")+
+  scale_y_continuous(sec.axis=sec_axis(~./scale-50, name="Growth Rate (%)"))+
+  theme_bw()
+```
+```{r}
+# GIF Demostrating the Change in Tourism GDP
+scale = 5000
+p1 = ggplot(data=tourismGDP_USA,aes(x=Date))+
+  geom_line(aes(y=Revenue),stat="identity", color = "blueviolet")+ 
+  labs(title= "Tourism GDP along Years",
+       x="Year (end in August)",y="Tourism GDP in Million")+
+  theme_bw()
+
+p1_anim<-p1+transition_reveal(Date)
+animate(p1_anim, renderer=gifski_renderer())
+
+anim_save("/Users/jordan/Desktop/Tourism.gif",animation=p1_anim, renderer=gifski_renderer())
+
+p1
+```
+
+
+
+```{r}
+merged_USA2 = subset(merged_USA, merged_USA$Date<as.Date("2021-08-31"))
+
+scale = 25
+ggplot(data=merged_USA2,aes(x=Date))+
+  geom_line(aes(y=new_cases_smoothed_per_million*scale),colour = "red")+
+  geom_point(aes(y=Revenue),colour = "blue")+
+  scale_y_continuous("Tourism GDP (Million USD)", sec.axis = sec_axis(~./scale, name = "New Cases"))+
+  theme_bw()+
+  theme(
+    axis.title.y.left=element_text(color="blue"),
+    axis.text.y.left=element_text(color="blue"),
+    axis.title.y.right=element_text(color="red"),
+    axis.text.y.right=element_text(color="red")
+    ) +
+  labs(title="New Cases Per Day VS Tourism GDP", x="Date")
+```
+
+```{r}
+merged_USA2 = subset(merged_USA, merged_USA$Date<as.Date("2021-08-31"))
+
+scale = 10000
+ggplot(data=merged_USA2,aes(x=Date))+
+  geom_point(aes(y=new_cases_growth_rate*scale),colour = "red")+
+  geom_point(aes(y=Revenue),colour = "blue")+
+  scale_y_continuous("Tourism GDP (Million USD)", sec.axis = sec_axis(~./scale, name = "New Cases"))+
+  theme_bw()+
+  theme(
+    axis.title.y.left=element_text(color="blue"),
+    axis.text.y.left=element_text(color="blue"),
+    axis.title.y.right=element_text(color="red"),
+    axis.text.y.right=element_text(color="red")
+    ) +
+  labs(title="New Cases Per Day VS Tourism GDP", x="Date")
+```
+
+```{r}
+# Airline Data by Date, with the smoothing
+ggplot(data=na.omit(flights_USA),aes(x=Date))+
+  geom_line(aes(y=passenger),colour = "blue")+
+  labs(title="Travel Numbers by Air", y="Passenger Count", x="Date")+
+  theme_bw()
+
+ggplot(data=na.omit(flights_USA),aes(x=Date))+
+  geom_line(aes(y=smoothing),colour = "blue")+
+  labs(title="Travel Numbers by Air", y="Passenger Count", x="Date")+
+  theme_bw()
+```
+```{r}
+# Airline Data by Date, with the smoothing
+ggplot(data=park,aes(x=Month))+
+  geom_line(aes(y=Visitations),colour = "blue")+
+  labs(title="National Park Visitors", y="Number of Visitors", x="Date")+
+  theme_bw()
+
+
+
+park2 = subset(park, park$Month>as.Date("2018-12-31"))
+park2 = na.omit(park2[, c("Month", "year","rate")])
+  
+scale = 10000000
+ggplot(data=park2,aes(x=Month))+
+  geom_bar(aes(y=year),stat="identity", fill ="gold")+
+  geom_line(aes(y=(rate+20)*scale),colour = "blue")+
+  scale_y_continuous("Tourism GDP (Million USD)", sec.axis = sec_axis(~./scale-20, name = "New Cases"))+
+  theme_bw()+
+  theme(
+    axis.title.y.left=element_text(color="blue"),
+    axis.text.y.left=element_text(color="blue"),
+    axis.title.y.right=element_text(color="red"),
+    axis.text.y.right=element_text(color="red")
+    ) +
+  labs(title="New Cases Per Day VS Tourism GDP", x="Date")
+```
+
+```{r}
+# Theoritical Determinates of Tourism
+dag3<-dagify(t ~ f+h+s,
+             f ~ r+i,
+             s ~ r+i,
+             h ~ r+i,
+             r ~ c,
+             i ~ c,
+             labels=c("t"="Tourism GDP", "r"= "Government Restrictions", "f"="Flights Volumn", "h"="Hospitality", "s"="Scenic Spots", "i" = "Disposable Income", "c" = "Covid"))
+ggdag(dag3, text=FALSE, use_labels="label")+
+  theme_dag_blank()+
+  ggtitle("Theoritical Determinates of Tourism")
+```
+
+```{r}
+longRev <- melt(AL_Rev, id.vars = c("Date"), variable.name = "Airline")
+longRev2 <- subset(longRev,longRev$Airline!="All_Rev")
+# Stacked barplot with multiple groups
+ggplot(data=longRev2, aes(x=Date, y=value, color=Airline)) +
+  geom_line(stat="identity") +
+  scale_color_brewer(palette="Set1")+ 
+  labs(title="Annual Revenue by Airlines", x="Year", y = "Annual Revenue in Thousand $")+
+  theme_bw()
+
+```
+
+```{r}
+longProyr <- melt(AL_Proyr, id.vars = c("Date"), variable.name = "Airline")
+# Stacked barplot with multiple groups
+ggplot(data=longProyr, aes(x=Date, y=value, fill=Airline)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  scale_fill_brewer(palette="Spectral")+ 
+  labs(title="Annual Profit by Airlines", x="Year", y = "Annual Profit in Thousand $")+
+  theme_bw()
+
+```
+
+```{r}
+longPro <- melt(AL_Pro, id.vars = c("Date"), variable.name = "Airline")
+longPro2 <- subset(longPro,longRev$Airline!="All_Pro")
+# Stacked barplot with multiple groups
+ggplot(data=longPro, aes(x=Date, y=value, color=Airline)) +
+  geom_line(stat="identity") +
+  scale_color_brewer(palette="Set1")+ 
+  labs(title="Annual Profit by Airlines", x="Year", y = "Annual Profit in Thousand $")+
+  theme_bw()
+
+```
+
+```{r}
+longPromar <- melt(AL_Promar, id.vars = c("Date"), variable.name = "Airline")
+# Stacked barplot with multiple groups
+ggplot(data=longPromar, aes(x=Date, y=value, color=Airline)) +
+  geom_line(stat="identity") +
+  scale_fill_brewer(palette="Blues")+ 
+  labs(title="Profit Margin by Airlines", x="Year", y = "Profit Margin (%)")+
+  theme_bw()
+
+```
+
+
+
+
